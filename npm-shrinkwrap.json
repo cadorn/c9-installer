@@ -1,0 +1,9 @@
+{
+  "name": "c9",
+  "version": "0.1.0",
+  "dependencies": {
+    "semver": {
+      "version": "1.0.13"
+    }
+  }
+}

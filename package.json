@@ -1,0 +1,26 @@
+{
+    "name": "c9",
+    "version": "0.1.0",
+    "label": "Cloud9 IDE Installer",
+    "description": "The installer for the desktop edition of Cloud9 IDE fully integrated with http://c9.io/",
+    "private": true,
+    "contributors": [
+        {
+            "name": "Christoph Dorn",
+            "email": "christoph@christophdorn.com"
+        }
+    ],
+    "engines": {
+        "node": ">= 0.6.15"
+    },
+    "dependencies": {
+        "semver": "1.0.13"
+    },
+    "bundleDependencies": [
+        "semver"
+    ],
+    "scripts": {
+        "postinstall": "node ./install.js",
+        "postupdate": "node ./install.js"
+    }
+}
