@@ -307,6 +307,6 @@ function mkdirsSync(path) {
     }
 }
 
-if (require.main === module) {
+if (require.main === module && !PATH.existsSync(PATH.join(__dirname, "..", "cloud9"))) {
     exports.install();
 }
