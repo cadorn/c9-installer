@@ -11,7 +11,7 @@ Install
     
     # Until live
     
-    npm install -g http://static.c9.io/c9local/prod/c9-0.1.0.tgz
+    npm install -g http://static.c9.io/c9local/prod/c9-0.1.1.tgz
 
 
 Publish
