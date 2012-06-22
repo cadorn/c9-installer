@@ -22,5 +22,6 @@ Publish
     npm publish
 
     # Until live
-    
-    scp ./c9-0.1.0.tgz cloud9@static.c9.io:~/static/c9local/prod/c9-0.1.0.tgz
+
+	npm pack    
+    scp ./c9-*.tgz cloud9@static.c9.io:~/static/c9local/prod/
