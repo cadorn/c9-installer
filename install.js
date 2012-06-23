@@ -127,7 +127,7 @@ exports.takeLive = function(version, callback) {
             FS.unlinkSync(INSTALL_LIVE_PATH);
         }
         printMessage("Linking new Cloud9 IDE version " + version + ".");
-        FS.symlinkSync(version, INSTALL_LIVE_PATH);
+        FS.symlinkSync("c9local-" + version, INSTALL_LIVE_PATH);
         callback(null);
     } catch(err) {
         callback(err);
@@ -152,7 +152,7 @@ exports.download = function(version, callback) {
                 callback(err);
                 return;
             }
-            FS.renameSync(INSTALL_WORKING_PATH, PATH.join(INSTALL_BASE_PATH, version));
+            FS.renameSync(INSTALL_WORKING_PATH, PATH.join(INSTALL_BASE_PATH, "c9local-" + version));
             callback(null);
         });
     });
