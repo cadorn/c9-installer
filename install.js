@@ -34,7 +34,10 @@ if (typeof process.env.SUDO_USER === "string" ||
     SUDO = true;
 
     var npmUsafePerm = process.env["npm_config_unsafe_perm"];
-    if (npmUsafePerm && npmUsafePerm !== "true") {
+    
+console.log(typeof npmUsafePerm === "string", npmUsafePerm);
+
+    if (typeof npmUsafePerm === "string" && npmUsafePerm !== "true") {
         printMessage([
             "ERROR: Cannot install Cloud9 IDE using `sudo` if NPM config option `unsafe-perm` is not set to `true`!",
             "To fix run the following before running the install again:",
