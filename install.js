@@ -147,7 +147,7 @@ exports.takeLive = function(version, callback) {
         }
         printMessage("Linking new Cloud9 IDE version " + version + ".");
         FS.symlinkSync("c9local-" + version, INSTALL_LIVE_PATH);
-        callback(null);
+        callback(null, INSTALL_LIVE_PATH);
     } catch(err) {
         callback(err);
     }    
