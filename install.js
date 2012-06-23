@@ -34,14 +34,15 @@ if (typeof process.env.SUDO_USER === "string" ||
     SUDO = true;
 }
 
-var oldVersion = false;
-var newVersion = false;
+var EXISTING_VERSION = false;
+var NEW_VERSION = false;
 var sigint = false;
 
-exports.install = function() {
+exports.install = function(options) {
 
-    exports.checkLatest(function(err, info) {
-        if (err) failAndExit(err);
+    options = options || {};
+
+    function install(existingVersion, newVersion, newer) {
 
         try {
             if (!PATH.existsSync(INSTALL_BASE_PATH)) {
@@ -51,12 +52,12 @@ exports.install = function() {
                 FS.mkdirSync(PATH.join(INSTALL_BASE_PATH, "node_modules"));
             }
 
-            oldVersion = info.oldVersion || false;
+            EXISTING_VERSION = existingVersion;
 
-            if (info.newer === true) {
-                newVersion = info.version;
+            if (newer === true) {
+                NEW_VERSION = newVersion;
             } else {
-                printMessage("You are running the latest version (" + oldVersion + ") of Cloud9 IDE!");
+                printMessage("You are running the latest version (" + EXISTING_VERSION + ") of Cloud9 IDE!");
                 successAndExit();
                 return;
             }
@@ -71,10 +72,10 @@ exports.install = function() {
             failAndExit(err);
         }
 
-        exports.download(newVersion, function(err) {
+        exports.download(NEW_VERSION, function(err) {
             if (err) failAndExit(err);
 
-            exports.takeLive(newVersion, function(err) {
+            exports.takeLive(NEW_VERSION, function(err) {
                 if (err) failAndExit(err);
 
                 installCommand(function(err) {
@@ -84,12 +85,30 @@ exports.install = function() {
                 });
             });
         });
-    });
+    }
+
+    if (options.version) {
+        getExitingVersion(function(err, version) {
+            if (err) failAndExit(err);
+            install(version, options.version, true);
+        });
+    } else {
+        exports.checkLatest(function(err, info) {
+            if (err) failAndExit(err);
+            install(info.existingVersion, info.version, info.newer);
+        });
+    }
 }
 
 function installCommand(callback) {
     try {
-        require(PATH.join(INSTALL_LIVE_PATH, "lib", "install-command.js")).installCommand({
+        var installCommandPath = PATH.join(INSTALL_LIVE_PATH, "lib", "install-command.js");
+        if (!PATH.existsSync(installCommandPath)) {
+            console.log("Skip calling `install-command` as path '" + installCommandPath + "' does not exist!");
+            callback(null);
+            return;
+        }
+        require(installCommandPath).installCommand({
             debug: false,
             mode: "production"
         }, function(err) {
@@ -121,8 +140,8 @@ function installCommand(callback) {
 exports.takeLive = function(version, callback) {
     try {
         if (PATH.existsSync(INSTALL_LIVE_PATH)) {
-            if (oldVersion) {
-                printMessage("Unlinking existing Cloud9 IDE version " + oldVersion + ".");
+            if (EXISTING_VERSION) {
+                printMessage("Unlinking existing Cloud9 IDE version " + EXISTING_VERSION + ".");
             }
             FS.unlinkSync(INSTALL_LIVE_PATH);
         }
@@ -135,14 +154,11 @@ exports.takeLive = function(version, callback) {
 }
 
 exports.download = function(version, callback) {
-    if (PATH.existsSync(PATH.join(INSTALL_BASE_PATH, version))) {
+    if (PATH.existsSync(PATH.join(INSTALL_BASE_PATH, "c9local-" + version))) {
         callback(null);
         return;
     }
-    installPackage({
-        version: version,
-        downloadUrl: DOWNLOAD_BASE_URL + "/c9local-" + version + ".tgz"
-    }, function(err) {
+    installPackage(version, function(err) {
         if (err) {
             callback(err);
             return;
@@ -173,11 +189,11 @@ function fixPermissions(callback) {
     }
 }
 
-function installPackage(info, callback) {
+function installPackage(version, callback) {
     var procCommand = "npm";
     var procArgs = [
         "install",
-        info.downloadUrl
+        DOWNLOAD_BASE_URL + "/c9local-" + version + ".tgz"
     ];
     var cwd = INSTALL_BASE_PATH;
     printMessage("Installing Cloud9 IDE: " + procCommand + " " + procArgs.join(" ") + " (cwd: " + cwd + ")");
@@ -215,11 +231,25 @@ function installPackage(info, callback) {
         sigint = true;
         installProc.kill();
         process.stdout.write("\n\n");
-        printMessage("Cancelling install of Cloud9 IDE version " + info.version + "!");
-        if (oldVersion) {
-            printMessage("Your existing install of Cloud9 IDE (version: " + oldVersion + ", path: " + INSTALL_LIVE_PATH + ") should still be functional.");
+        printMessage("Cancelling install of Cloud9 IDE!");
+        if (EXISTING_VERSION) {
+            printMessage("Your existing install of Cloud9 IDE (version: " + EXISTING_VERSION + ", path: " + INSTALL_LIVE_PATH + ") should still be functional.");
         }
     });
+}
+
+function getExitingVersion(callback) {
+    var version = false;
+    try {
+        if (PATH.existsSync(PATH.join(INSTALL_LIVE_PATH, "package.json"))) {
+            var descriptor = JSON.parse(FS.readFileSync(PATH.join(INSTALL_LIVE_PATH, "package.json")));
+            version = JSON.parse(FS.readFileSync(PATH.join(INSTALL_LIVE_PATH, "package.json"))).version;
+        }
+    } catch(err) {
+        callback(err);
+        return;
+    }
+    callback(null, version);
 }
 
 exports.checkLatest = function(callback) {
@@ -245,23 +275,22 @@ exports.checkLatest = function(callback) {
                 callback(new Error("Error '" + err + "' while parsing JSON: " + data));
                 return;
             }
-            info.downloadUrl = DOWNLOAD_BASE_URL + "/c9local-" + info.version + ".tgz";
-            try {
-                info.newer = false;
-                if (PATH.existsSync(PATH.join(INSTALL_LIVE_PATH, "package.json"))) {
-                    var descriptor = JSON.parse(FS.readFileSync(PATH.join(INSTALL_LIVE_PATH, "package.json")));
-                    info.oldVersion = descriptor.version;
-                    if (SEMVER.compare(info.version, info.oldVersion) === 1) {
+            info.newer = false;
+            getExitingVersion(function(err, version) {
+                if (err) {
+                    callback(err);
+                    return;
+                }
+                if (version) {
+                    info.existingVersion = version;
+                    if (SEMVER.compare(info.version, info.existingVersion) === 1) {
                         info.newer = true;
                     }
                 } else {
                     info.newer = true;
                 }
-            } catch(err) {
-                callback(err);
-                return;
-            }
-            callback(null, info);
+                callback(null, info);
+            });
         });
     }).on('error', function(e) {
         callback(e);
@@ -271,8 +300,8 @@ exports.checkLatest = function(callback) {
 function failAndExit(err) {
     if (err && !sigint) {
         printMessage(err.stack || err, true);
-        if (newVersion) {
-            printMessage("There was an ERROR installing Cloud9 IDE version " + newVersion + ". See above.");
+        if (NEW_VERSION) {
+            printMessage("There was an ERROR installing Cloud9 IDE version " + NEW_VERSION + ". See above.");
         } else {
             printMessage("There was an ERROR checking your Cloud9 IDE install. See above.");
         }
