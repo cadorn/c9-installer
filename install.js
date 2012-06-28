@@ -8,7 +8,7 @@ const URL = require("url");
 const HTTP = require("http");
 const SEMVER = require("semver");
 
-const DOWNLOAD_BASE_URL = "d6ff1xmuve0sx.cloudfront.net/c9local/prod";
+const DOWNLOAD_BASE_URL = "http://d6ff1xmuve0sx.cloudfront.net/c9local/prod";
 const LATEST_URL = "http://static.c9.io/c9local/prod/latest.json";
 const HOME_PATH = process.env.HOME;
 
@@ -238,7 +238,7 @@ function installPackage(version, callback) {
             return;
         }
         var tarCommand = "tar -xzf " + PATH.join(NPM_INSTALL_DIR, version, tgzFilename) + " -C " + PATH.join(NPM_INSTALL_DIR, version);
-        console.log("Untarrring: " + tarCommand);
+        //console.log("Untarrring: " + tarCommand);
         EXEC(tarCommand, function (error, stdout, stderr) {
             if (error || stderr) {
                 callback(new Error(stderr));
