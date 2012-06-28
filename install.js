@@ -49,7 +49,7 @@ var EXISTING_VERSION = false;
 var NEW_VERSION = false;
 var sigint = false;
 
-exports.install = function(options) {
+exports.install = function(options, callback) {
 
     options = options || {};
 
@@ -69,7 +69,7 @@ exports.install = function(options) {
                 NEW_VERSION = newVersion;
             } else {
                 printMessage("You are running the latest version (" + EXISTING_VERSION + ") of Cloud9 IDE!");
-                successAndExit();
+                successAndExit(callback);
                 return;
             }
 
@@ -86,7 +86,7 @@ exports.install = function(options) {
                 installCommand(function(err) {
                     if (err) failAndExit(err);
 
-                    successAndExit();
+                    successAndExit(callback);
                 });
             });
         });
@@ -334,8 +334,11 @@ function failAndExit(err) {
     process.exit(1);
 }
 
-function successAndExit() {
-    process.exit(0);
+function successAndExit(callback) {
+    if (callback)
+        callback();
+    else
+        process.exit(0);
 }
 
 function printMessage(message, error) {
