@@ -25,7 +25,6 @@ const C9_BASE_PATH = PATH.join(HOME_PATH, ".c9");
 const INSTALL_BASE_PATH = PATH.join(C9_BASE_PATH, "installs");
 const INSTALL_LIVE_PATH = PATH.join(INSTALL_BASE_PATH, "c9local");
 const INSTALL_WORKING_PATH = PATH.join(INSTALL_BASE_PATH, "node_modules", "c9local");
-const NPM_INSTALL_DIR = PATH.join(HOME_PATH, ".npm", "c9local");
 
 var SUDO = false;
 if (typeof process.env.SUDO_USER === "string" ||
@@ -72,12 +71,6 @@ exports.install = function(options) {
                 printMessage("You are running the latest version (" + EXISTING_VERSION + ") of Cloud9 IDE!");
                 successAndExit();
                 return;
-            }
-
-            // Backup existing install working directory if it exists. This only happens if install was cancelled
-            // half way through and it can probably just be deleted but we keep it just in case.
-            if (PATH.existsSync(INSTALL_WORKING_PATH)) {
-                FS.renameSync(INSTALL_WORKING_PATH, PATH.join(INSTALL_BASE_PATH, "node_modules", "~c9local-" + (new Date().getTime())));
             }
 
         } catch (err) {
@@ -180,7 +173,8 @@ exports.download = function(version, callback) {
                 callback(err);
                 return;
             }
-            FS.renameSync(INSTALL_WORKING_PATH, PATH.join(INSTALL_BASE_PATH, "c9local-" + version));
+            FS.renameSync(PATH.join(INSTALL_WORKING_PATH, "package"), PATH.join(INSTALL_BASE_PATH, "c9local-" + version));
+            FS.rmdirSync(INSTALL_WORKING_PATH);
             callback(null);
         });
     });
@@ -202,61 +196,71 @@ function fixPermissions(callback) {
 }
 
 function installPackage(version, callback) {
-    var NPMDirVersion = PATH.join(NPM_INSTALL_DIR, version);
-    var tgzFilename = "c9local-" + version + ".tgz";
-    var procCommand = "wget";
-    var procArgs = [
-        "-nv",
-        "-P",
-        NPMDirVersion,
-        PATH.join(DOWNLOAD_BASE_URL, tgzFilename),
-        "-N"
-    ];
 
-    var cwd = INSTALL_BASE_PATH;
-    printMessage("Installing Cloud9 IDE: " + procCommand + " " + procArgs.join(" ") + " (cwd: " + cwd + ")");
-
-    var installProc = SPAWN(procCommand, procArgs, {
-        cwd: cwd
-    });
-    installProc.on("error", function(err) {
+    function fail(err) {
+        if (!callback) return;
         callback(err);
-    });
-    installProc.stdout.on("data", function(data) {
-        if (!sigint) {
-            process.stdout.write(data);
-        }
-    });
-    installProc.stderr.on("data", function(data) {
-        if (!sigint) {
-            process.stderr.write(data);
-        }
-    });
-    installProc.on("exit", function(code) {
-        if (code !== 0) {
-            callback(new Error("`wget` ran into an issue installing Cloud9 IDE!"));
-            return;
-        }
-        var tarCommand = "tar -xzf " + PATH.join(NPM_INSTALL_DIR, version, tgzFilename) + " -C " + PATH.join(NPM_INSTALL_DIR, version);
-        //console.log("Untarrring: " + tarCommand);
-        EXEC(tarCommand, function (error, stdout, stderr) {
+        callback = null;
+    }
+
+    function success() {
+        if (!callback) return;
+        callback(null);
+        callback = null;
+    }
+
+    // Backup existing install working directory if it exists. This only happens if install was cancelled
+    // half way through and it can probably just be deleted but we keep it just in case.
+    if (PATH.existsSync(INSTALL_WORKING_PATH)) {
+        FS.renameSync(INSTALL_WORKING_PATH, PATH.join(PATH.dirname(INSTALL_WORKING_PATH), "~c9local~backup-" + (new Date().getTime())));
+    }
+
+    var downloadTmpPath = PATH.join(PATH.dirname(INSTALL_WORKING_PATH), "~c9local~download-" + new Date().getTime());
+    var downloadURLInfo = URL.parse(DOWNLOAD_BASE_URL + "/c9local-" + version + ".tgz");
+
+    var writeStream = FS.createWriteStream(downloadTmpPath);
+    writeStream.on("error", fail);
+    writeStream.on("close", function() {
+
+        // TODO: Verify checksum of `downloadTmpPath` against checkum from `LATEST_URL`.
+
+        // Now extract archive.
+
+        FS.mkdirSync(INSTALL_WORKING_PATH);
+
+        console.log("Extracting: " + downloadTmpPath);
+
+        EXEC("tar -xzf " + downloadTmpPath + " -C " + INSTALL_WORKING_PATH, function (error, stdout, stderr) {
             if (error || stderr) {
                 callback(new Error(stderr));
                 return;
             }
-            copyDirSyncRecursive(PATH.join(NPM_INSTALL_DIR, version, "package"), PATH.join(cwd, "node_modules", "c9local"));
-            callback(null);
+            FS.unlinkSync(downloadTmpPath);
+            success();
         });
     });
-    process.once("SIGINT", function() {
-        sigint = true;
-        installProc.kill();
-        process.stdout.write("\n\n");
-        printMessage("Cancelling install of Cloud9 IDE!");
-        if (EXISTING_VERSION) {
-            printMessage("Your existing install of Cloud9 IDE (version: " + EXISTING_VERSION + ", path: " + INSTALL_LIVE_PATH + ") should still be functional.");
+
+    console.log("Downloading: " + downloadURLInfo.href);
+
+    var request = HTTP.request({
+        host: downloadURLInfo.host,
+        port: downloadURLInfo.port,
+        path: downloadURLInfo.path,
+        method: "GET"
+    }, function(res) {
+        if (res.statusCode !== 200) {
+            fail(new Error("Problem downloading Cloud9 IDE release. Got status code: " + res.statusCode));
+            return;
         }
+        res.on("data", function(chunk) {
+            writeStream.write(chunk, "binary");
+        });
+        res.on("end", function() {
+            writeStream.end();
+        });
     });
+    request.on("error", fail);
+    request.end();
 }
 
 function getExitingVersion(callback) {
@@ -356,41 +360,6 @@ function mkdirsSync(path) {
         }
     }
 }
-
-function copyDirSyncRecursive(sourceDir, newDirLocation, opts) {
-    if (!opts || !opts.preserve) {
-        try {
-            if(FS.statSync(newDirLocation).isDirectory()) exports.rmdirSyncRecursive(newDirLocation);
-        } catch(e) { }
-    }
-
-    /*  Create the directory where all our junk is moving to; read the mode of the source directory and mirror it */
-    var checkDir = FS.statSync(sourceDir);
-    try {
-        FS.mkdirSync(newDirLocation, checkDir.mode);
-    } catch (e) {
-        //if the directory already exists, that's okay
-        if (e.code !== 'EEXIST') throw e;
-    }
-
-    var files = FS.readdirSync(sourceDir);
-
-    for(var i = 0; i < files.length; i++) {
-        var currFile = FS.lstatSync(sourceDir + "/" + files[i]);
-
-        if(currFile.isDirectory()) {
-            /*  recursion this thing right on back. */
-            copyDirSyncRecursive(sourceDir + "/" + files[i], newDirLocation + "/" + files[i], opts);
-        } else if(currFile.isSymbolicLink()) {
-            var symlinkFull = FS.readlinkSync(sourceDir + "/" + files[i]);
-            FS.symlinkSync(symlinkFull, newDirLocation + "/" + files[i]);
-        } else {
-            /*  At this point, we've hit a file actually worth copying... so copy it on over. */
-            var contents = FS.readFileSync(sourceDir + "/" + files[i]);
-            FS.writeFileSync(newDirLocation + "/" + files[i], contents);
-        }
-    }
-};
 
 if (require.main === module && !PATH.existsSync(PATH.join(__dirname, "..", "cloud9"))) {
     exports.install();
