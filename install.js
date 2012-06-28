@@ -8,7 +8,7 @@ const URL = require("url");
 const HTTP = require("http");
 const SEMVER = require("semver");
 
-const DOWNLOAD_BASE_URL = "http://d6ff1xmuve0sx.cloudfront.net/c9local/prod";
+const DOWNLOAD_BASE_URL = "d6ff1xmuve0sx.cloudfront.net/c9local/prod";
 const LATEST_URL = "http://static.c9.io/c9local/prod/latest.json";
 const HOME_PATH = process.env.HOME;
 
@@ -25,6 +25,7 @@ const C9_BASE_PATH = PATH.join(HOME_PATH, ".c9");
 const INSTALL_BASE_PATH = PATH.join(C9_BASE_PATH, "installs");
 const INSTALL_LIVE_PATH = PATH.join(INSTALL_BASE_PATH, "c9local");
 const INSTALL_WORKING_PATH = PATH.join(INSTALL_BASE_PATH, "node_modules", "c9local");
+const NPM_INSTALL_DIR = PATH.join(HOME_PATH, ".npm", "c9local");
 
 var SUDO = false;
 if (typeof process.env.SUDO_USER === "string" ||
@@ -201,22 +202,22 @@ function fixPermissions(callback) {
 }
 
 function installPackage(version, callback) {
-    var procCommand = "npm";
+    var NPMDirVersion = PATH.join(NPM_INSTALL_DIR, version);
+    var tgzFilename = "c9local-" + version + ".tgz";
+    var procCommand = "wget";
     var procArgs = [
-        "install",
-        DOWNLOAD_BASE_URL + "/c9local-" + version + ".tgz"
+        "-nv",
+        "-P",
+        NPMDirVersion,
+        PATH.join(DOWNLOAD_BASE_URL, tgzFilename),
+        "-N"
     ];
+
     var cwd = INSTALL_BASE_PATH;
     printMessage("Installing Cloud9 IDE: " + procCommand + " " + procArgs.join(" ") + " (cwd: " + cwd + ")");
-    var env = {};
-    for (var name in process.env) {
-        if (!/^npm_/i.test(name)) {
-            env[name] = process.env[name];
-        }
-    }
+
     var installProc = SPAWN(procCommand, procArgs, {
-        cwd: cwd,
-        env: env
+        cwd: cwd
     });
     installProc.on("error", function(err) {
         callback(err);
@@ -233,10 +234,19 @@ function installPackage(version, callback) {
     });
     installProc.on("exit", function(code) {
         if (code !== 0) {
-            callback(new Error("`npm` ran into an issue installing Cloud9 IDE!"));
+            callback(new Error("`wget` ran into an issue installing Cloud9 IDE!"));
             return;
         }
-        callback(null);
+        var tarCommand = "tar -xzf " + PATH.join(NPM_INSTALL_DIR, version, tgzFilename) + " -C " + PATH.join(NPM_INSTALL_DIR, version);
+        console.log("Untarrring: " + tarCommand);
+        EXEC(tarCommand, function (error, stdout, stderr) {
+            if (error || stderr) {
+                callback(new Error(stderr));
+                return;
+            }
+            copyDirSyncRecursive(PATH.join(NPM_INSTALL_DIR, version, "package"), PATH.join(cwd, "node_modules", "c9local"));
+            callback(null);
+        });
     });
     process.once("SIGINT", function() {
         sigint = true;
@@ -346,6 +356,41 @@ function mkdirsSync(path) {
         }
     }
 }
+
+function copyDirSyncRecursive(sourceDir, newDirLocation, opts) {
+    if (!opts || !opts.preserve) {
+        try {
+            if(FS.statSync(newDirLocation).isDirectory()) exports.rmdirSyncRecursive(newDirLocation);
+        } catch(e) { }
+    }
+
+    /*  Create the directory where all our junk is moving to; read the mode of the source directory and mirror it */
+    var checkDir = FS.statSync(sourceDir);
+    try {
+        FS.mkdirSync(newDirLocation, checkDir.mode);
+    } catch (e) {
+        //if the directory already exists, that's okay
+        if (e.code !== 'EEXIST') throw e;
+    }
+
+    var files = FS.readdirSync(sourceDir);
+
+    for(var i = 0; i < files.length; i++) {
+        var currFile = FS.lstatSync(sourceDir + "/" + files[i]);
+
+        if(currFile.isDirectory()) {
+            /*  recursion this thing right on back. */
+            copyDirSyncRecursive(sourceDir + "/" + files[i], newDirLocation + "/" + files[i], opts);
+        } else if(currFile.isSymbolicLink()) {
+            var symlinkFull = FS.readlinkSync(sourceDir + "/" + files[i]);
+            FS.symlinkSync(symlinkFull, newDirLocation + "/" + files[i]);
+        } else {
+            /*  At this point, we've hit a file actually worth copying... so copy it on over. */
+            var contents = FS.readFileSync(sourceDir + "/" + files[i]);
+            FS.writeFileSync(newDirLocation + "/" + files[i], contents);
+        }
+    }
+};
 
 if (require.main === module && !PATH.existsSync(PATH.join(__dirname, "..", "cloud9"))) {
     exports.install();
