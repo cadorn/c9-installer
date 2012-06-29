@@ -48,8 +48,9 @@ if (typeof process.env.SUDO_USER === "string" ||
 var EXISTING_VERSION = false;
 var NEW_VERSION = false;
 var sigint = false;
+var options;
 
-exports.install = function(options, callback) {
+exports.install = function(_options, callback) {
 
     options = options || {};
 
@@ -117,7 +118,7 @@ function installCommand(callback) {
             debug: false,
             mode: "production"
         }, function(err) {
-            if (err) {
+            if (err && !!options.onPath) {
                 printMessage([
                     "Cloud9 IDE has been installed!",
                     "",
