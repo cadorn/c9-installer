@@ -52,7 +52,7 @@ var options;
 
 exports.install = function(_options, callback) {
 
-    options = options || {};
+    options = _options || {};
 
     function install(existingVersion, newVersion, newer) {
 
@@ -118,7 +118,7 @@ function installCommand(callback) {
             debug: false,
             mode: "production"
         }, function(err) {
-            if (err && !!options.onPath) {
+            if (err && options.fromDMG !== true) {
                 printMessage([
                     "Cloud9 IDE has been installed!",
                     "",
