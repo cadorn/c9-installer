@@ -70,7 +70,7 @@ exports.install = function(_options, callback) {
                 NEW_VERSION = newVersion;
             } else {
                 printMessage("You are running the latest version (" + EXISTING_VERSION + ") of Cloud9 IDE!");
-                successAndExit(callback);
+                successAndExit(callback, true);
                 return;
             }
 
@@ -335,9 +335,9 @@ function failAndExit(err) {
     process.exit(1);
 }
 
-function successAndExit(callback) {
+function successAndExit(callback, isLatest) {
     if (callback)
-        callback();
+        callback(isLatest);
     else
         process.exit(0);
 }
