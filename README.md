@@ -13,6 +13,4 @@ Install
 Publish
 -------
 
-    npm shrinkwrap
-    sm bump
-    npm publish
+    sm bump -p
