@@ -6,7 +6,7 @@ const SPAWN = require("child_process").spawn;
 const EXEC = require("child_process").exec;
 const URL = require("url");
 const HTTP = require("http");
-const SEMVER = require("semver");
+const SEMVER = require("./semver");
 
 const DOWNLOAD_BASE_URL = "http://d6ff1xmuve0sx.cloudfront.net/c9local/prod";
 const LATEST_URL = "http://static.c9.io/c9local/prod/latest.json";

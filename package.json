@@ -13,13 +13,6 @@
         "node": ">= 0.6.15"
     },
     "pm": "npm",
-    "shrinkwrap": true,
-    "dependencies": {
-        "semver": "1.0.13"
-    },
-    "bundleDependencies": [
-        "semver"
-    ],
     "scripts": {
         "postinstall": "node ./install.js",
         "postupdate": "node ./install.js"
