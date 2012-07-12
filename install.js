@@ -120,9 +120,11 @@ function installCommand(callback) {
         }, function(err) {
             if (err && options.fromDMG !== true) {
                 printMessage([
-                    "Cloud9 IDE has been installed!",
+                    "Cloud9 IDE has been installed successfully!",
                     "",
-                    "RUN THE FOLLOWING to put `c9` on your `PATH`:",
+                    "Please add `$HOME/.c9/installs/c9local/bin/c9` to your PATH.",
+                    "",
+                    "Alternatively you can run the following:",
                     "",
                     "    sudo " + PATH.join(INSTALL_LIVE_PATH, "bin", "c9") + " --install-command"
                 ]);
