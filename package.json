@@ -1,6 +1,6 @@
 {
     "name": "c9",
-    "version": "0.1.16",
+    "version": "0.1.17",
     "label": "Cloud9 IDE Installer",
     "description": "The installer for the desktop edition of Cloud9 IDE fully integrated with http://c9.io/",
     "contributors": [
