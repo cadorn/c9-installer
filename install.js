@@ -130,7 +130,7 @@ function installCommand(callback) {
             printMessage([
                 "Cloud9 IDE has been installed!",
                 "",
-                "You can also start using `c9` on your command line. To see the options, type:",
+                "You can start using `c9` on your command line. To see the options, type:",
                 "",
                 "    c9 -h"
             ]);
