@@ -80,10 +80,14 @@ exports.install = function(_options, callback) {
             exports.takeLive(NEW_VERSION, function(err) {
                 if (err) failAndExit(err);
 
-                installCommand(function(err) {
+                fixPermissions(function(err) {
                     if (err) failAndExit(err);
 
-                    successAndExit(callback);
+                    installCommand(function(err) {
+                        if (err) failAndExit(err);
+
+                        successAndExit(callback);
+                    });
                 });
             });
         });
@@ -99,6 +103,21 @@ exports.install = function(_options, callback) {
             if (err) failAndExit(err);
             install(info.existingVersion, info.version, info.newer);
         });
+    }
+}
+
+function fixPermissions(callback) {
+    if (SUDO) {
+        printMessage("Updating permissions: chown -Rf " + process.env.SUDO_UID + ":" + process.env.SUDO_GID + " " + C9_BASE_PATH);
+        EXEC("chown -R " + process.env.SUDO_UID + ":" + process.env.SUDO_GID + " " + C9_BASE_PATH, function(error, stdout, stderr) {
+            if (error || stderr) {
+                callback(new Error(stderr));
+                return;
+            }
+            callback(null);
+        });
+    } else {
+        callback(null);
     }
 }
 
@@ -167,31 +186,10 @@ exports.download = function(version, callback) {
             callback(err);
             return;
         }
-        fixPermissions(function(err) {
-            if (err) {
-                callback(err);
-                return;
-            }
-            FS.renameSync(PATH.join(INSTALL_WORKING_PATH, "package"), PATH.join(INSTALL_BASE_PATH, "c9local-" + version));
-            FS.rmdirSync(INSTALL_WORKING_PATH);
-            callback(null);
-        });
-    });
-}
-
-function fixPermissions(callback) {
-    if (SUDO) {
-        printMessage("Updating permissions: chown -Rf " + process.env.SUDO_UID + ":" + process.env.SUDO_GID + " " + C9_BASE_PATH);
-        EXEC("chown -R " + process.env.SUDO_UID + ":" + process.env.SUDO_GID + " " + C9_BASE_PATH, function(error, stdout, stderr) {
-            if (error || stderr) {
-                callback(new Error(stderr));
-                return;
-            }
-            callback(null);
-        });
-    } else {
+        FS.renameSync(PATH.join(INSTALL_WORKING_PATH, "package"), PATH.join(INSTALL_BASE_PATH, "c9local-" + version));
+        FS.rmdirSync(INSTALL_WORKING_PATH);
         callback(null);
-    }
+    });
 }
 
 function installPackage(version, callback) {
