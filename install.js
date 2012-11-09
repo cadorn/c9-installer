@@ -22,7 +22,12 @@ if (typeof process.env.SUDO_USER === "string" ||
     // If `sudo` is run with `-H`, `process.env.HOME` will be set to `/root`.
     // We need to correct that as the user will want the files in their home dir.
     if (HOME_PATH === "/root") {
-        HOME_PATH = PATH.join("/home", process.env.SUDO_USER);
+        if (PATH.existsSync(PATH.join("/home", process.env.SUDO_USER))) {
+            HOME_PATH = PATH.join("/home", process.env.SUDO_USER);
+        } else
+        if (PATH.existsSync(PATH.join("/Users", process.env.SUDO_USER))) {
+            HOME_PATH = PATH.join("/Users", process.env.SUDO_USER);
+        }
     }
 }
 
