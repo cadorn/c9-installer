@@ -10,7 +10,21 @@ const SEMVER = require("./semver");
 
 const DOWNLOAD_BASE_URL = "http://d6ff1xmuve0sx.cloudfront.net/c9local/prod";
 const LATEST_URL = "http://static.c9.io/c9local/prod/latest.json";
-const HOME_PATH = process.env.HOME;
+var HOME_PATH = process.env.HOME;
+
+var SUDO = false;
+if (typeof process.env.SUDO_USER === "string" ||
+    typeof process.env.SUDO_UID === "string" ||
+    typeof process.env.SUDO_GID === "string"
+) {
+    SUDO = true;
+
+    // If `sudo` is run with `-H`, `process.env.HOME` will be set to `/root`.
+    // We need to correct that as the user will want the files in their home dir.
+    if (HOME_PATH === "/root") {
+        HOME_PATH = PATH.join("/home", process.env.SUDO_USER);
+    }
+}
 
 if (!HOME_PATH) {
     printMessage("`HOME` environment variable not set!");
@@ -26,24 +40,6 @@ const INSTALL_BASE_PATH = PATH.join(C9_BASE_PATH, "installs");
 const INSTALL_LIVE_PATH = PATH.join(INSTALL_BASE_PATH, "c9local");
 const INSTALL_WORKING_PATH = PATH.join(INSTALL_BASE_PATH, "node_modules", "c9local");
 
-var SUDO = false;
-if (typeof process.env.SUDO_USER === "string" ||
-    typeof process.env.SUDO_UID === "string" ||
-    typeof process.env.SUDO_GID === "string"
-) {
-    SUDO = true;
-
-    var npmUsafePerm = process.env["npm_config_unsafe_perm"];
-    if (typeof npmUsafePerm === "string" && npmUsafePerm !== "true") {
-        printMessage([
-            "ERROR: Cannot install Cloud9 IDE using `sudo` if NPM config option `unsafe-perm` is not set to `true`!",
-            "To fix run the following before running the install again:",
-            "",
-            "    " + "npm config set unsafe-perm true"
-        ]);
-        process.exit(1);
-    }
-}
 
 var EXISTING_VERSION = false;
 var NEW_VERSION = false;
